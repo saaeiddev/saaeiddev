@@ -1,8 +1,7 @@
 - 👋 Hi, I’m @saaeiddev ( amir saeid dehghan )
-- 👀 I’m interested in web design, programming, computer science, new technologies
-- 🌱 I’m currently learning SEO and improving my web design skill
+- 👀 I’m interested in computer science, new technologies , Arts and Entertainment & Cars. 
 - 💞️ I’m looking to collaborate on ...
-- 📫 How to contact me : follow me on twitter @detecivesaeid , follow me on instagram @saeidmedia9 , telegram @emperorsaeid 
+- 📫 How to contact me : follow me on twitter @detecivesaeid , telegram @amirsaeiddehghan
 
 <!---
 saaeiddev/saaeiddev is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
