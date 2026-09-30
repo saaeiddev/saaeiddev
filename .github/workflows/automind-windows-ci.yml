@@ -44,10 +44,55 @@ jobs:
         shell: powershell
         run: choco install innosetup -y --no-progress
 
-      - name: Build and test Windows installer
+      - name: Build Windows executable and installer
         shell: powershell
         working-directory: AutoMindAI
-        run: .\scripts\build_windows.ps1
+        run: .\scripts\build_windows.ps1 -SkipInstallTest
+
+      - name: Install, self-test, and uninstall installer
+        shell: powershell
+        working-directory: AutoMindAI
+        run: |
+          $Installer = Join-Path $PWD "dist\installer\AutoMindAI-Setup.exe"
+          if (-not (Test-Path $Installer)) { throw "Installer missing." }
+
+          $TestDir = Join-Path $env:RUNNER_TEMP "AutoMindAI-InstallTest"
+          $InstallLog = Join-Path $env:RUNNER_TEMP "AutoMindAI-InstallTest.log"
+          Remove-Item -Recurse -Force $TestDir -ErrorAction SilentlyContinue
+          Remove-Item -Force $InstallLog -ErrorAction SilentlyContinue
+
+          $args = @(
+            "/VERYSILENT",
+            "/SUPPRESSMSGBOXES",
+            "/NORESTART",
+            "/SP-",
+            "/DIR=$TestDir",
+            "/LOG=$InstallLog"
+          )
+          Start-Process -FilePath $Installer -ArgumentList $args -Wait | Out-Null
+
+          $InstalledExe = Join-Path $TestDir "AutoMindAI.exe"
+          $deadline = (Get-Date).AddSeconds(45)
+          while (-not (Test-Path $InstalledExe) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (-not (Test-Path $InstalledExe)) {
+            if (Test-Path $InstallLog) { Get-Content $InstallLog -Tail 120 | Write-Host }
+            throw "Installer QA failed: installed executable not found."
+          }
+
+          & $InstalledExe --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Installed executable self-test failed." }
+
+          $Uninstaller = Join-Path $TestDir "unins000.exe"
+          if (-not (Test-Path $Uninstaller)) { throw "Uninstaller missing after install." }
+          Start-Process -FilePath $Uninstaller -ArgumentList @("/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART") -Wait | Out-Null
+
+          $deadline = (Get-Date).AddSeconds(45)
+          while ((Test-Path $InstalledExe) -and (Get-Date) -lt $deadline) {
+            Start-Sleep -Milliseconds 500
+          }
+          if (Test-Path $InstalledExe) { throw "Uninstall QA failed: installed executable still exists." }
 
       - name: Upload AutoMind AI Windows installer
         uses: actions/upload-artifact@v4
