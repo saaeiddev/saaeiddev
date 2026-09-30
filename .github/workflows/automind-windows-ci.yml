@@ -1,0 +1,61 @@
+name: AutoMind AI Windows CI Build
+on:
+  push:
+    branches:
+      - automind-ci-0.1.0
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Reassemble AutoMind AI source archive
+        shell: powershell
+        run: |
+          $parts = Get-ChildItem -Path "automind_ci" -Filter "part*" | Sort-Object Name
+          if ($parts.Count -lt 1) { throw "No source parts found." }
+          $outPath = Join-Path $PWD "AutoMindAI-Source-0.1.0.zip"
+          $stream = [System.IO.File]::Open($outPath, [System.IO.FileMode]::Create)
+          try {
+            foreach ($part in $parts) {
+              $bytes = [System.IO.File]::ReadAllBytes($part.FullName)
+              $stream.Write($bytes, 0, $bytes.Length)
+            }
+          } finally {
+            $stream.Dispose()
+          }
+          Expand-Archive -Path $outPath -DestinationPath "." -Force
+          if (-not (Test-Path "AutoMindAI\main.py")) { throw "Source extraction failed." }
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: AutoMindAI/requirements-dev.txt
+
+      - name: Install Inno Setup
+        shell: powershell
+        run: choco install innosetup -y --no-progress
+
+      - name: Build and test Windows installer
+        shell: powershell
+        working-directory: AutoMindAI
+        run: .\scripts\build_windows.ps1
+
+      - name: Upload AutoMind AI Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoMindAI-Windows-0.1.0
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            AutoMindAI/dist/AutoMindAI.exe
+            AutoMindAI/dist/installer/AutoMindAI-Setup.exe
+            AutoMindAI/dist/SHA256SUMS.txt
