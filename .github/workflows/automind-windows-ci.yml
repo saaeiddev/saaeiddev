@@ -49,6 +49,17 @@ jobs:
         working-directory: AutoMindAI
         run: .\scripts\build_windows.ps1 -SkipInstallTest
 
+      - name: Strict packaged executable self-test
+        shell: powershell
+        working-directory: AutoMindAI
+        run: |
+          $PackagedExe = Join-Path $PWD "dist\AutoMindAI.exe"
+          if (-not (Test-Path $PackagedExe)) { throw "Packaged executable missing." }
+          $SelfTest = Start-Process -FilePath $PackagedExe -ArgumentList "--self-test" -Wait -PassThru
+          if ($SelfTest.ExitCode -ne 0) {
+            throw "Packaged executable self-test failed with exit code $($SelfTest.ExitCode)."
+          }
+
       - name: Install, self-test, and uninstall installer
         shell: powershell
         working-directory: AutoMindAI
@@ -81,8 +92,10 @@ jobs:
             throw "Installer QA failed: installed executable not found."
           }
 
-          & $InstalledExe --self-test
-          if ($LASTEXITCODE -ne 0) { throw "Installed executable self-test failed." }
+          $InstalledSelfTest = Start-Process -FilePath $InstalledExe -ArgumentList "--self-test" -Wait -PassThru
+          if ($InstalledSelfTest.ExitCode -ne 0) {
+            throw "Installed executable self-test failed with exit code $($InstalledSelfTest.ExitCode)."
+          }
 
           $Uninstaller = Join-Path $TestDir "unins000.exe"
           if (-not (Test-Path $Uninstaller)) { throw "Uninstaller missing after install." }
@@ -92,7 +105,9 @@ jobs:
           while ((Test-Path $InstalledExe) -and (Get-Date) -lt $deadline) {
             Start-Sleep -Milliseconds 500
           }
-          if (Test-Path $InstalledExe) { throw "Uninstall QA failed: installed executable still exists." }
+          if (Test-Path $InstalledExe) {
+            throw "Uninstall QA failed: installed executable still exists."
+          }
 
       - name: Upload AutoMind AI Windows installer
         uses: actions/upload-artifact@v4
